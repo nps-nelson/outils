@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APK Builder Studio - Transformez votre HTML en APK via GitHub Actions</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-indigo-500 selection:text-white">
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-cube text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">APK Builder Studio</h1>
+                    <p class="text-xs text-slate-400">Compilation gratuite d'APK Android via GitHub Actions</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openSettingsModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition flex items-center space-x-2 border border-slate-700">
+                    <i class="fa-solid fa-key text-indigo-400"></i>
+                    <span id="tokenStatusText">Configurer GitHub</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Left 2 Cols: Builder Form -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- Step 1: App Info -->
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur shadow-xl">
+                <div class="flex items-center space-x-3 mb-4">
+                    <span class="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm">1</span>
+                    <h2 class="text-base font-semibold text-white">Informations de l'application</h2>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Nom de l'application</label>
+                        <input type="text" id="appName" value="Mon Application" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Identifiant unique (Package ID)</label>
+                        <input type="text" id="appId" value="com.example.myapp" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: HTML Import -->
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur shadow-xl">
+                <div class="flex items-center space-x-3 mb-4">
+                    <span class="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm">2</span>
+                    <h2 class="text-base font-semibold text-white">Importer votre fichier HTML (ou ZIP du site)</h2>
+                </div>
+                
+                <div id="dropZone" class="border-2 border-dashed border-slate-700/80 hover:border-indigo-500/60 rounded-xl p-8 text-center cursor-pointer transition bg-slate-950/40 relative group">
+                    <input type="file" id="fileInput" accept=".html,.htm,.zip" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                    <div class="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                    </div>
+                    <p class="text-sm font-medium text-slate-200 mb-1" id="filePromptText">Glissez votre fichier <code class="text-indigo-400">index.html</code> ou un <code class="text-indigo-400">.zip</code> ici</p>
+                    <p class="text-xs text-slate-400">ou cliquez pour parcourir vos fichiers</p>
+                </div>
+                
+                <!-- Quick HTML Editor preview toggle -->
+                <div class="mt-4 flex items-center justify-between">
+                    <span class="text-xs text-slate-400" id="selectedFileInfo">Aucun fichier sélectionné (un index.html par défaut sera généré si vide)</span>
+                    <button type="button" onclick="toggleEditor()" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
+                        <i class="fa-solid fa-code mr-1"></i> Éditer le code HTML source
+                    </button>
+                </div>
+
+                <div id="editorContainer" class="mt-3 hidden">
+                    <textarea id="htmlSourceCode" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-indigo-200 focus:outline-none focus:border-indigo-500 transition">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;fr&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+    &lt;title&gt;Mon App WebView&lt;/title&gt;
+    &lt;style&gt;
+        body { font-family: system-ui; background: #0f172a; color: #fff; padding: 2rem; text-align: center; }
+        h1 { color: #818cf8; }
+        button { background: #6366f1; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Bienvenue dans mon APK !&lt;/h1&gt;
+    &lt;p&gt;Cette application a été compilée gratuitement avec GitHub Actions.&lt;/p&gt;
+    &lt;button onclick=&quot;alert('Action exécutée depuis l\\'APK natif !')&quot;&gt;Tester le bouton&lt;/button&gt;
+&lt;/body&gt;
+&lt;/html&gt;</textarea>
+                </div>
+            </div>
+
+            <!-- Step 3: Compile Trigger -->
+            <div class="bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/60 border border-indigo-500/30 rounded-2xl p-6 backdrop-blur shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center space-x-3">
+                    <span class="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm">3</span>
+                    <div>
+                        <h2 class="text-base font-semibold text-white">Lancer la compilation</h2>
+                        <p class="text-xs text-slate-300">Crée le dépôt GitHub, pousse le code et déclenche Gradle</p>
+                    </div>
+                </div>
+                <button id="compileBtn" onclick="startCompilation()" class="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/25 transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-hammer"></i>
+                    <span>Compiler l'APK</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Right Col: Logs & Status -->
+        <div class="space-y-6">
+            
+            <!-- GitHub Repository Status Card -->
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur shadow-xl">
+                <h3 class="text-sm font-semibold text-white mb-3 flex items-center space-x-2">
+                    <i class="fa-brands fa-github text-indigo-400"></i>
+                    <span>Cible GitHub</span>
+                </h3>
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <span class="text-slate-400 block mb-1">Nom du dépôt GitHub à créer :</span>
+                        <input type="text" id="repoName" value="apk-builder-output" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9-_]/g, '-')">
+                    </div>
+                    <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">État du token :</span>
+                            <span id="tokenStatusBadge" class="text-amber-400 font-medium">Non configuré</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Méthode :</span>
+                            <span class="text-slate-200">Capacitor WebView</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Build Console -->
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur shadow-xl flex flex-col h-96">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-terminal text-indigo-400"></i>
+                        <span>Console de compilation</span>
+                    </h3>
+                    <span id="buildStateBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400">En attente</span>
+                </div>
+                
+                <div id="consoleLog" class="flex-1 bg-slate-950 rounded-xl p-4 font-mono text-[11px] text-slate-300 overflow-y-auto space-y-1.5 border border-slate-800/80 select-all">
+                    <div class="text-slate-500">[00:00:00] Prêt. Veuillez configurer votre token GitHub et lancer la compilation.</div>
+                </div>
+
+                <div id="downloadArea" class="mt-4 hidden">
+                    <a id="downloadLink" href="#" target="_blank" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/20">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Télécharger l'APK (.apk)</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-base text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-key text-indigo-400"></i>
+                    <span>Configuration GitHub API</span>
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                Pour créer automatiquement le dépôt et lancer GitHub Actions gratuitement, entrez un Personal Access Token (PAT) GitHub avec les scopes <code class="text-indigo-400">repo</code> et <code class="text-indigo-400">workflow</code>.
+            </p>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">GitHub Personal Access Token</label>
+                <input type="password" id="ghTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono">
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button onclick="closeSettingsModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition">Annuler</button>
+                <button onclick="saveToken()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/20">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS Logic -->
+    <script>
+        let githubToken = localStorage.getItem('apk_builder_gh_token') || '';
+        let uploadedFileContent = null;
+        let uploadedFileName = 'index.html';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            updateTokenUI();
+        });
+
+        function openSettingsModal() {
+            document.getElementById('ghTokenInput').value = githubToken;
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function saveToken() {
+            githubToken = document.getElementById('ghTokenInput').value.trim();
+            localStorage.setItem('apk_builder_gh_token', githubToken);
+            updateTokenUI();
+            closeSettingsModal();
+        }
+
+        function updateTokenUI() {
+            const badge = document.getElementById('tokenStatusBadge');
+            const text = document.getElementById('tokenStatusText');
+            if (githubToken && githubToken.length > 10) {
+                badge.textContent = 'Configuré ✓';
+                badge.className = 'text-emerald-400 font-medium';
+                text.textContent = 'GitHub Connecté';
+            } else {
+                badge.textContent = 'Non configuré';
+                badge.className = 'text-amber-400 font-medium';
+                text.textContent = 'Configurer GitHub';
+            }
+        }
+
+        function toggleEditor() {
+            const ed = document.getElementById('editorContainer');
+            ed.classList.toggle('hidden');
+        }
+
+        // File drop handling
+        const fileInput = document.getElementById('fileInput');
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            uploadedFileName = file.name;
+            document.getElementById('selectedFileInfo').textContent = `Fichier chargé : ${file.name} (${Math.round(file.size/1024)} Ko)`;
+            
+            if (file.name.endsWith('.zip')) {
+                const zip = new JSZip();
+                const zipContent = await zip.loadAsync(file);
+                // Check for index.html inside zip
+                if (zipContent.files['index.html']) {
+                    uploadedFileContent = await zipContent.files['index.html'].async('text');
+                    document.getElementById('htmlSourceCode').value = uploadedFileContent;
+                } else {
+                    logMessage('⚠️ Attention : index.html non trouvé à la racine du ZIP.');
+                }
+            } else {
+                uploadedFileContent = await file.text();
+                document.getElementById('htmlSourceCode').value = uploadedFileContent;
+            }
+            logMessage(`Fichier ${file.name} chargé avec succès.`);
+        });
+
+        function logMessage(msg) {
+            const consoleEl = document.getElementById('consoleLog');
+            const time = new Date().toTimeString().split(' ')[0];
+            consoleEl.innerHTML += `<div><span class="text-slate-500">[${time}]</span> ${msg}</div>`;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        async function startCompilation() {
+            if (!githubToken) {
+                alert('Veuillez d\'abord configurer votre token GitHub dans les paramètres en haut à droite.');
+                openSettingsModal();
+                return;
+            }
+
+            const appName = document.getElementById('appName').value.trim() || 'Mon App';
+            const appId = document.getElementById('appId').value.trim() || 'com.example.myapp';
+            const repoName = document.getElementById('repoName').value.trim() || 'apk-builder-output';
+            const htmlCode = document.getElementById('htmlSourceCode').value;
+
+            document.getElementById('compileBtn').disabled = true;
+            document.getElementById('compileBtn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Compilation en cours...</span>';
+            const stateBadge = document.getElementById('buildStateBadge');
+            stateBadge.textContent = 'En cours';
+            stateBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-400 animate-pulse';
+
+            logMessage(`🚀 Initialisation du dépôt GitHub "${repoName}"...`);
+
+            try {
+                // 1. Get authenticated user
+                const userRes = await fetch('https://api.github.com/user', {
+                    headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
+                });
+                if (!userRes.ok) throw new Error('Token GitHub invalide ou expiré.');
+                const userData = await userRes.json();
+                const owner = userData.login;
+                logMessage(`✓ Authentifié en tant que @${owner}`);
+
+                // 2. Create or get repo
+                logMessage(`Vérification / création du dépôt ${owner}/${repoName}...`);
+                let repoRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}`, {
+                    headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
+                });
+
+                if (repoRes.status === 404) {
+                    const createRes = await fetch('https://api.github.com/user/repos', {
+                        method: 'POST',
+                        headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: repoName, private: false, auto_init: true })
+                    });
+                    if (!createRes.ok) throw new Error('Impossible de créer le dépôt GitHub.');
+                    logMessage(`✓ Dépôt ${owner}/${repoName} créé avec succès.`);
+                    // wait 2s for git init
+                    await new Promise(r => setTimeout(r, 3000));
+                } else {
+                    logMessage(`✓ Le dépôt existe déjà.`);
+                }
+
+                // 3. Prepare files to commit (Capacitor project structure + GitHub Actions workflow)
+                logMessage(`Génération de la structure Capacitor & workflow Gradle Android...`);
+
+                const workflowYaml = `name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies & Capacitor
+        run: |
+          npm install --save-dev @capacitor/cli @capacitor/core @capacitor/android
+          npx @capacitor/cli init "${appName}" "${appId}" --web-dir www
+          npx @capacitor/cli add android
+
+      - name: Build Web Assets & Sync
+        run: |
+          mkdir -p www
+          cp src/index.html www/index.html
+          npx cap sync android
+
+      - name: Accept Android SDK Licenses & Build APK
+        run: |
+          cd android
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          echo y | sdkmanager --licenses || true
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+`;
+
+                const filesToCommit = [
+                    { path: 'package.json', content: JSON.stringify({ name: repoName, version: "1.0.0", dependencies: { "@capacitor/android": "^5.0.0", "@capacitor/cli": "^5.0.0", "@capacitor/core": "^5.0.0" } }, null, 2) },
+                    { path: 'src/index.html', content: htmlCode },
+                    { path: '.github/workflows/build-apk.yml', content: workflowYaml }
+                ];
+
+                // Commit each file via GitHub Contents API
+                for (const file of filesToCommit) {
+                    let sha = undefined;
+                    // check if file exists to get sha
+                    const checkFileRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/${file.path}`, {
+                        headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
+                    });
+                    if (checkFileRes.ok) {
+                        const fileData = await checkFileRes.json();
+                        sha = fileData.sha;
+                    }
+
+                    const putRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/${file.path}`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: `Add ${file.path} for APK build`,
+                            content: btoa(unescape(encodeURIComponent(file.content))),
+                            sha: sha
+                        })
+                    });
+                    if (!putRes.ok) {
+                        const errBody = await putRes.text();
+                        throw new Error(`Erreur commit ${file.path}: ${errBody}`);
+                    }
+                    logMessage(`✓ Fichier ${file.path} commité.`);
+                }
+
+                logMessage(`🚀 Workflow GitHub Actions déclenché !`);
+                logMessage(`⏳ GitHub compile votre APK (cela prend environ 2 à 3 minutes)...`);
+                stateBadge.textContent = 'En cours (GitHub Actions)';
+                stateBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/20 text-indigo-400 animate-pulse';
+
+                // Poll workflow runs
+                let runId = null;
+                for (let i = 0; i < 20; i++) {
+                    await new Promise(r => setTimeout(r, 10000));
+                    const runsRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/actions/runs`, {
+                        headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
+                    });
+                    if (runsRes.ok) {
+                        const runsData = await runsRes.json();
+                        if (runsData.workflow_runs && runsData.workflow_runs.length > 0) {
+                            const latestRun = runsData.workflow_runs[0];
+                            runId = latestRun.id;
+                            logMessage(`Statut actuel du build: ${latestRun.status} (${latestRun.conclusion || 'en cours'})`);
+                            if (latestRun.status === 'completed') {
+                                if (latestRun.conclusion === 'success') {
+                                    logMessage(`🎉 Compilation réussie avec succès !`);
+                                    stateBadge.textContent = 'Succès ✓';
+                                    stateBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-400';
+                                    
+                                    // Fetch artifacts
+                                    const artifactsRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/actions/runs/${runId}/artifacts`, {
+                                        headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
+                                    });
+                                    if (artifactsRes.ok) {
+                                        const artData = await artifactsRes.json();
+                                        if (artData.artifacts && artData.artifacts.length > 0) {
+                                            const art = artData.artifacts[0];
+                                            logMessage(`📦 Artefact APK trouvé : ${art.name} (${Math.round(art.size_in_bytes/1024/1024 * 100) / 100} Mo)`);
+                                            
+                                            // Provide download link (direct link to workflow run artifacts page or direct download if zip)
+                                            const dlLink = document.getElementById('downloadLink');
+                                            dlLink.href = `https://github.com/${owner}/${repoName}/actions/runs/${runId}`;
+                                           
+                                            // Auto trigger download if artifact download URL can be constructed
+                                            const directArtifactUrl = `https://github.com/${owner}/${repoName}/actions/runs/${runId}/artifacts/${art.id}`;
+                                            dlLink.href = directArtifactUrl;
+
+                                            document.getElementById('downloadArea').classList.remove('hidden');
+                                            logMessage(`✨ APK prêt à être téléchargé ! Cliquez sur le bouton ci-dessous.`);
+                                        }
+                                    }
+                                } else {
+                                    // Fetch failed job logs to help debug
+                                    logMessage(`⚠️ Le build a échoué. Récupération des logs GitHub Actions...`);
+                                    try {
+                                        const jobsRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/actions/runs/${runId}/jobs`, {
+                                            headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
+                                        });
+                                        if (jobsRes.ok) {
+                                            const jobsData = await jobsRes.json();
+                                            if (jobsData.jobs && jobsData.jobs.length > 0) {
+                                                const failedJob = jobsData.jobs.find(j => j.conclusion === 'failure') || jobsData.jobs[0];
+                                                logMessage(`❌ Étape en échec : ${failedJob.name}`);
+                                                // Fetch job log text if available
+                                                const logRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/actions/jobs/${failedJob.id}/logs`, {
+                                                    headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
+                                                });
+                                                if (logRes.ok) {
+                                                    const logText = await logRes.text();
+                                                    const lines = logText.split('\n');
+                                                    const tailLines = lines.slice(-40).join('\n');
+                                                    logMessage(`📋 Dernières lignes du log :\n${tailLines}`);
+                                                }
+                                            }
+                                        }
+                                    } catch(logErr) {
+                                        logMessage(`Impossible de récupérer les logs détaillés: ${logErr.message}`);
+                                    }
+                                    throw new Error(`Le build GitHub Actions a échoué (conclusion: ${latestRun.conclusion}).`);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!runId) {
+                    logMessage(`⚠️ Timeout de surveillance. Vous pouvez vérifier l'avancement sur : https://github.com/${owner}/${repoName}/actions`);
+                }
+
+            } catch (err) {
+                logMessage(`❌ Erreur : ${err.message}`);
+                stateBadge.textContent = 'Erreur ✗';
+                stateBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-rose-500/20 text-rose-400';
+            } finally {
+                document.getElementById('compileBtn').disabled = false;
+                document.getElementById('compileBtn').innerHTML = '<i class="fa-solid fa-hammer"></i><span>Compiler l\'APK</span>';
+            }
+        }
+    </script>
+</body>
+</html>
